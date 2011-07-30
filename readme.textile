@@ -1,0 +1,15 @@
+h1. Astra Flash Components
+
+Forked by Josh Tynjala from Astra Flash 1.4. Originally developed by Yahoo! Inc.
+
+Since Yahoo! has officially deprecated the Astra Flash components, I created this fork to keep the source available in the event that Yahoo! chooses to remove the project from their developer portal.
+
+Please note: Although I was an original developer involved with the Astra projects when I worked at Yahoo! between 2006 and 2008, I have no current plans for maintaining or adding to these components.
+
+h2. Disclaimer
+
+The respository is neither owned, maintained, nor endorsed by Yahoo! Inc.
+
+h2. Usage
+
+Download and extract astra-flash-1.4.zip to access the compiled MXP for the Astra Flash components. The MXP may be installed for Adobe Flash Professional with Adobe Extension Manager.

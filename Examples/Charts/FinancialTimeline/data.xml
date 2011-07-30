@@ -1,0 +1,10 @@
+<finances>
+	<month date="Dec 1 2007" revenue="13000" expenses="13500"/>
+	<month date="Jan 1 2008" revenue="13500" expenses="13700"/>
+	<month date="Feb 1 2008" revenue="12600" expenses="13000"/>
+	<month date="Mar 1 2008" revenue="11900" expenses="12500"/>
+	<month date="Apr 1 2008" revenue="12800" expenses="12900"/>
+	<month date="May 1 2008" revenue="13000" expenses="13100"/>
+	<month date="Jun 1 2008" revenue="13400" expenses="13800"/>
+	<month date="Jul 1 2008" revenue="13800" expenses="13600"/>
+</finances>
