@@ -75,6 +75,75 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		}
 		
 		/**
+		 * Flag indicating whether page size was set manually or automatically calculated.
+		 */
+		protected var pageSizeSetExternally:Boolean = false;
+		
+		/**
+		 * @private
+		 */
+		private var _pageSize:int = -1;
+		
+		/**
+		 * @inheritDoc
+		 * 
+		 * <p>You may set a specific number of items to display in the carousel
+		 * at one time and the carousel will resize to make them all visible.</p>
+		 * 
+		 * <p>The default value is <code>-1</code>, which means that no
+		 * changes to the width and height will be made and the page size will
+		 * be calculated automatically based on the set width and height of the
+		 * Carousel. Some items may only be partially visible (cut off).</p>
+		 * 
+		 * @default -1
+		 */
+		public function get pageSize():int
+		{
+			return this._pageSize;
+		}
+		
+		public function set pageSize(value:int):void
+		{
+			this._pageSize = value;
+			this.pageSizeSetExternally = this._pageSize >= 0;
+		}
+		
+		/**
+		 * @private
+		 */
+		private var _stepSize:int = 1;
+		
+		/**
+		 * @inheritDoc
+		 * 
+		 * <p>Unlike some other layouts, the step size of this layout is editable.</p>
+		 * 
+		 * @default 1
+		 */
+		public function get stepSize():int
+		{
+			return this._stepSize;
+		}
+		
+		/**
+		 * @private
+		 */
+		public function set stepSize(value:int):void
+		{
+			this._stepSize = value;
+		}
+		
+		/**
+		 * @private
+		 */
+		protected var maxScrollIndex:int = 0;
+		
+		/**
+		 * @private
+		 */
+		protected var minScrollIndex:int = 0;
+		
+		/**
 		 * @private
 		 * Storage for the direction property.
 		 */
@@ -204,36 +273,6 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		
 		/**
 		 * @private
-		 * Storage for the displayedItemCount property.
-		 */
-		private var _displayedItemCount:int = 0;
-		
-		/**
-		 * Sets a specific number of items to display in the carousel at one
-		 * time and resizes the carousel to make them all visible. This property
-		 * is useful for developers who want to display carousel items in
-		 * "pages" with a specific number of items per page.</p>
-		 * 
-		 * <p>The default value is <code>0</code> (zero), which means that no
-		 * changes to the width and height will be made. Some items may only
-		 * be partially visible (cut off).</p>
-		 */
-		public function get displayedItemCount():int
-		{
-			return this._displayedItemCount;
-		}
-		
-		/**
-		 * @private
-		 */
-		public function set displayedItemCount(value:int):void
-		{
-			this._displayedItemCount = value;
-			this.invalidate(InvalidationType.DATA);
-		}
-		
-		/**
-		 * @private
 		 * Storage for the forceCreationOfAllRenderers property.
 		 */
 		private var _drawAllRenderers:Boolean = false;
@@ -288,6 +327,33 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			//no need to validate
 		}
 		
+		/**
+		 * @private
+		 */
+		private var _snapToEdges:Boolean = false;
+
+		/**
+		 * When <code>snapToEdges</code> is <code>false</code>, the selected
+		 * cell renderer will always be displayed at a fixed position defined by
+		 * the combination of direction and alignment. When <code>true</code>,
+		 * the layout algorithm will try to minimize whitespace on the edges
+		 * of the carousel. 
+		 */
+		public function get snapToEdges():Boolean
+		{
+			return this._snapToEdges;
+		}
+		
+		/**
+		 * @private
+		 */
+		public function set snapToEdges(value:Boolean):void
+		{
+			this._snapToEdges = value;
+			this.invalidate(InvalidationType.SCROLL);
+		}
+
+		
 	//--------------------------------------
 	//  Public Methods
 	//--------------------------------------
@@ -318,6 +384,8 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			var oldWidth:Number = this.width;
 			var oldHeight:Number = this.height;
 			
+			this.calculatePageIndices();
+			
 			if(this.carousel.length == 0 || this.carousel.selectedIndex < 0)
 			{
 				//nothing to draw
@@ -338,10 +406,22 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			
 			super.draw();
 			
-			if(this.displayedItemCount > 0 && (oldWidth != this.width || oldHeight != this.height))
+			if(this.pageSizeSetExternally && this.pageSize >= 0 && (oldWidth != this.width || oldHeight != this.height))
 			{
 				this.dispatchEvent(new ComponentEvent(ComponentEvent.RESIZE));
 			}
+		}
+		
+		/**
+		 * @private
+		 */
+		override protected function validate():void
+		{
+			super.validate();
+			
+			//don't let the component draw again when it doesn't need to
+			//monkey patch to ensure animation will work.
+			delete this.callLaterMethods[draw];
 		}
 	
 		/**
@@ -351,19 +431,28 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		 */
 		protected function calculateDimensions(renderers:Array):void
 		{
-			var selectedRenderer:DisplayObject = DisplayObject(this.carousel.itemToCellRenderer(this.carousel.selectedItem));
-			if(this.displayedItemCount > 0)
+			if(renderers.length == 0 || !this.pageSizeSetExternally || this.pageSize < 0)
 			{
-				if(this.direction == "horizontal")
-				{
-					this._width = selectedRenderer.width * this.displayedItemCount + this.horizontalGap * (this.displayedItemCount - 1);
-					this._height = selectedRenderer.height;
-				}
-				else
-				{
-					this._width = selectedRenderer.width;
-					this._height = selectedRenderer.height * this.displayedItemCount + this.verticalGap * (this.displayedItemCount - 1);
-				} 
+				return;
+			}
+			
+			var pageSizeUsedInCalculation:int = this.pageSize;
+			if((this.direction == "horizontal" && this.horizontalAlign == "center") ||
+				(this.direction == "vertical" && this.verticalAlign == "middle"))
+			{
+				pageSizeUsedInCalculation++;
+			}
+			
+			var firstRenderer:DisplayObject = DisplayObject(renderers[0]);
+			if(this.direction == "horizontal")
+			{
+				this._width = firstRenderer.width * pageSizeUsedInCalculation + this.horizontalGap * (pageSizeUsedInCalculation - 1);
+				this._height = firstRenderer.height;
+			}
+			else
+			{
+				this._width = firstRenderer.width;
+				this._height = firstRenderer.height * pageSizeUsedInCalculation + this.verticalGap * (pageSizeUsedInCalculation - 1);
 			}
 		}
 		
@@ -376,7 +465,7 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			this.carousel.astra_carousel_internal::invalidateCellRenderers();
 			
 			var renderers:Array = [];
-			var rendererCount:int = this.carousel.length;
+			var rendererCount:int = Math.ceil(this.calculateRendererCountForDimensions());
 			for(var i:int = 0; i < rendererCount; i++)
 			{	
 				var item:Object = this.carousel.dataProvider.getItemAt(i);
@@ -395,35 +484,6 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		
 		/**
 		 * @private
-		 * Determines the number of renderers that will be displayed.
-		 */
-		protected function calculateRendererCount():int
-		{
-			var rendererCount:int = this.carousel.length;
-			if(rendererCount > 0 && !this.drawAllRenderers)
-			{
-				var firstItem:Object = this.carousel.dataProvider.getItemAt(0);
-				var firstRenderer:DisplayObject = this.carousel.astra_carousel_internal::createCellRenderer(firstItem);
-				var totalDisplayedItemCount:int = this.displayedItemCount;
-				if(this.displayedItemCount == 0)
-				{
-					if(this.direction == "horizontal")
-					{
-						totalDisplayedItemCount = Math.ceil(this.width / firstRenderer.width);
-					}
-					else
-					{
-						totalDisplayedItemCount = Math.ceil(this.height / firstRenderer.height);
-					} 
-				}
-				rendererCount = totalDisplayedItemCount;
-			}
-			
-			return Math.min(this.carousel.length, rendererCount);
-		}
-		
-		/**
-		 * @private
 		 * Positions the renderers.
 		 */
 		protected function layoutRenderers(renderers:Array):void
@@ -433,6 +493,118 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			boxLayout.verticalGap = this.verticalGap;
 			boxLayout.horizontalGap = this.horizontalGap;
 			boxLayout.layoutObjects(renderers, new Rectangle(0, 0, this.width, this.height));
+		}
+		
+		/**
+		 * @private
+		 * Determines the number of renderers that can be drawn in the current
+		 * dimensions. Returns Number because this value includes partial
+		 * renderers. Should use Math.ceil as part of the calculation for the
+		 * actual number of renderers needed.
+		 */
+		protected function calculateRendererCountForDimensions():Number
+		{
+			if(this.carousel.length == 0)
+			{
+				return 0;
+			}
+			
+			var count:Number = 0;
+			var firstItem:Object = this.carousel.dataProvider.getItemAt(0);	
+			var firstRenderer:DisplayObject = this.carousel.astra_carousel_internal::createCellRenderer(firstItem);
+			if(this.direction == "horizontal")
+			{
+				count = (this._width + this._horizontalGap) / (firstRenderer.width + this._horizontalGap);
+			}
+			else //vertical
+			{
+				count = (this._height + this._verticalGap) / (firstRenderer.height + this._verticalGap);
+			}
+			
+			if((this.direction == "horizontal" && this.horizontalAlign == "center") ||
+				(this.direction == "vertical" && this.verticalAlign == "middle"))
+			{
+				count += 2;
+			}
+			return count;
+		}
+		
+		/**
+		 * @private
+		 * Calculates the idea page size for the current dimensions. This value
+		 * may be different than the actual number of renderers needed.
+		 */
+		protected function calculatePageSize():int
+		{
+			var estimatedPageSize:int = Math.floor(this.calculateRendererCountForDimensions());
+			if((this.direction == "horizontal" && this.horizontalAlign == "center") ||
+				(this.direction == "vertical" && this.verticalAlign == "middle"))
+			{
+				estimatedPageSize -= 2;
+				
+				if(estimatedPageSize % 2 == 0)
+				{
+					//because we want it perfectly centered, we don't want an
+					//even number.
+					estimatedPageSize--;
+				}
+			}
+			
+			return Math.max(estimatedPageSize, 1);
+		}
+		
+		/**
+		 * @private
+		 * Calculates the pageSize (only if not explicitly set by the user),
+		 * and the minimum and maximum scroll indicies (only if snapToEdges is
+		 * true).
+		 */
+		private function calculatePageIndices():void
+		{
+			if(!this.pageSizeSetExternally)
+			{
+				this._pageSize = this.calculatePageSize();
+			}
+			if(!this._snapToEdges)
+			{
+				this.minScrollIndex = 0;
+				this.maxScrollIndex = this.carousel.dataProvider.length - 1;
+				return;
+			}
+			
+			this.minScrollIndex = 0;
+			if((this.direction == "horizontal" && this.horizontalAlign == "right") ||
+				(this.direction == "vertical" && this.verticalAlign == "bottom"))
+			{
+				this.minScrollIndex = this.pageSize - 1;
+			}
+			else if((this.direction == "horizontal" && this.horizontalAlign == "center") ||
+				(this.direction == "vertical" && this.verticalAlign == "middle"))
+			{
+				this.minScrollIndex = Math.floor(this.pageSize / 2);
+				if(this.pageSize % 2 == 0)
+				{
+					this.minScrollIndex--;
+				}
+			}
+			this.minScrollIndex = Math.max(0, this.minScrollIndex);
+			
+			this.maxScrollIndex = this.carousel.length - this.pageSize;
+			if((this.direction == "horizontal" && this.horizontalAlign == "right") ||
+				(this.direction == "vertical" && this.verticalAlign == "bottom"))
+			{
+				this.maxScrollIndex = this._carousel.length - 1;
+			}
+			else if((this.direction == "horizontal" && this.horizontalAlign == "center") ||
+				(this.direction == "vertical" && this.verticalAlign == "middle"))
+			{
+				this.maxScrollIndex = this._carousel.length - Math.ceil(this.pageSize / 2);
+				if(this.pageSize % 2 == 0)
+				{
+					this.maxScrollIndex--;
+				}
+			}
+			this.maxScrollIndex = Math.min(this._carousel.length - 1, this.maxScrollIndex);
 		}
 		
 		/**

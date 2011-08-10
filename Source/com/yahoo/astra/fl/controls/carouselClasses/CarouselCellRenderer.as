@@ -149,19 +149,28 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			{
 				this.textField.width = 0;
 				this.textField.height = 0;
+				this.textField.y = this.height;
 			}
-			
-			var textPadding:Number = this.getStyleValue("textPadding") as Number;
-			this.textField.y = this.height - this.textField.height - textPadding;
-			if(this.selected)
+			else
 			{
-				
+				var textPadding:Number = this.getStyleValue("textPadding") as Number;
+				this.textField.y = this.height - this.textField.height - textPadding;
 			}
 			
 			var imagePadding:Number = this.getStyleValue("imagePadding") as Number;
 			var loaderWidth:Number = this.width - 2 * imagePadding;
-			var loaderHeight:Number = this.textField.y - imagePadding - Math.max(imagePadding, textPadding);
+			var loaderHeight:Number = this.textField.y - imagePadding;
+			if(this.label.length == 0)
+			{
+				loaderHeight -= imagePadding;
+			}
+			else
+			{
+				loaderHeight -= Math.max(imagePadding, textPadding);
+			}
 			this.loader.setSize(loaderWidth, loaderHeight);
+			this.loader.x = (this.width - loaderWidth) / 2;
+			this.loader.y = imagePadding;
 			this.loader.drawNow();
 			
 			super.draw();

@@ -97,9 +97,9 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		
 		/**
 		 * @private
-		 * The last value of the selectedItem;
+		 * The last value of the selectedIndex;
 		 */
-		protected var previouslySelectedItem:Object;
+		protected var previouslySelectedIndex:int = -1;
 		
 	//--------------------------------------
 	//  Protected Methods
@@ -127,10 +127,7 @@ package com.yahoo.astra.fl.controls.carouselClasses
 				return;
 			}
 			
-			var selectedRenderer:ICellRenderer = this.carousel.itemToCellRenderer(this.carousel.selectedItem);
-			this.moveToRenderer(selectedRenderer);
-			
-			this.previouslySelectedItem = this.carousel.selectedItem;
+			this.moveToIndex(this.carousel.selectedIndex);
 		}
 		
 		/**
@@ -145,86 +142,61 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			var rendererCount:int = this.carousel.length;
 			if(!this.drawAllRenderers)
 			{
-				var selectedRenderer:DisplayObject = this.carousel.astra_carousel_internal::createCellRenderer(this.carousel.selectedItem);
-				var pageItemCount:int = this.displayedItemCount;
-				if(this.displayedItemCount == 0)
-				{
-					if(this.direction == "horizontal")
-					{
-						pageItemCount = Math.ceil(this.width / (selectedRenderer.width + this.horizontalGap));
-					}
-					else
-					{
-						pageItemCount = Math.ceil(this.height / (selectedRenderer.height + this.verticalGap));
-					}
-				}
+				var partialRendererCount:Number = this.calculateRendererCountForDimensions();
+				var adjustedPageSize:int = Math.ceil(partialRendererCount);
 				
-				if((this.direction == "horizontal" && this.horizontalAlign == "center") ||
-					(this.direction == "vertical" && this.verticalAlign == "middle"))
-				{
-					pageItemCount++;
-				}
+				var oldIndex:int = Math.min(this.maxScrollIndex, Math.max(this.minScrollIndex, this.previouslySelectedIndex));
+				var newIndex:int = Math.min(this.maxScrollIndex, Math.max(this.minScrollIndex, this.carousel.selectedIndex));
 				
-				var oldIndex:int = this.carousel.dataProvider.getItemIndex(this.previouslySelectedItem);
-				var newIndex:int = this.carousel.selectedIndex;
-				if(oldIndex < 0)
-				{
-					oldIndex = newIndex;
-				}
 				startIndex = Math.min(oldIndex, newIndex);
 				var endIndex:int = Math.max(oldIndex, newIndex);
 				
-				rendererCount = Math.abs(oldIndex - newIndex) + pageItemCount;
-				if(this.direction == "horizontal")
+				var difference:int = endIndex - startIndex;
+				
+				if((this.direction == "horizontal" && this.horizontalAlign == "left") ||
+					(this.direction == "vertical" && this.verticalAlign == "top"))
 				{
-					switch(this.horizontalAlign)
-					{
-						case "center":
-						{
-							startIndex -= ((pageItemCount - 1) / 2);
-							startIndex = Math.max(startIndex, 0);
-							if(oldIndex == 0 || oldIndex == this.carousel.length - 1)
-							{
-								rendererCount--;
-							}
-							if((newIndex == 0 || newIndex == this.carousel.length - 1) && newIndex != oldIndex)
-							{
-								rendererCount--;
-							}
-							break;
-						}
-						case "right":
-						{
-							startIndex -= (pageItemCount - 1);
-							startIndex = Math.max(startIndex, 0);
-							if(newIndex == 0 || oldIndex == 0)
-							{
-								rendererCount--;
-							}
-							break;
-						}
-						default: //left
-						{
-							if(oldIndex == this.carousel.length - 1 || newIndex == this.carousel.length - 1)
-							{
-								rendererCount--;
-							}
-							break;
-						}
-					}
+					var afterCount:int = Math.min(adjustedPageSize, this.carousel.length - endIndex);
+					rendererCount = afterCount + difference;
+				}			
+				else if((this.direction == "horizontal" && this.horizontalAlign == "right") ||
+					(this.direction == "vertical" && this.verticalAlign == "bottom"))
+				{
+					var beforeCount:int = Math.min(adjustedPageSize, startIndex + 1);
+					rendererCount = beforeCount + difference;
 				}
+				else //center or middle
+				{
+					var halfPage:int = Math.floor((adjustedPageSize - 1) / 2);
+					beforeCount = Math.min(halfPage, startIndex);
+					afterCount = Math.min(halfPage, this.carousel.length - endIndex - 1);
+					rendererCount = beforeCount + afterCount + difference + 1;
+				}
+				
 			}
+			
+			if((this.direction == "horizontal" && this.horizontalAlign == "center") ||
+				(this.direction == "vertical" && this.verticalAlign == "middle"))
+			{
+				startIndex -= halfPage;
+			}
+			else if((this.direction == "horizontal" && this.horizontalAlign == "right") ||
+				(this.direction == "vertical" && this.verticalAlign == "bottom"))
+			{
+				startIndex -= (adjustedPageSize - 1);
+			}
+			startIndex = Math.max(0, startIndex);
 			
 			var renderers:Array = [];
 			for(var i:int = 0; i < rendererCount; i++)
 			{
-				var index:int = startIndex + i;
-				if(index >= this.carousel.length)
+				var itemIndex:int = i + startIndex;
+				if(itemIndex >= this.carousel.length)
 				{
 					break;
 				}
 				
-				var item:Object = this.carousel.dataProvider.getItemAt(index);
+				var item:Object = this.carousel.dataProvider.getItemAt(itemIndex);
 				var renderer:ICellRenderer = this.carousel.astra_carousel_internal::createCellRenderer(item);
 				Sprite(renderer).addEventListener(MouseEvent.CLICK, rendererClickHandler, false, 0, true);
 				if(renderer is UIComponent)
@@ -243,8 +215,12 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		 * Animates the scrollRect to display the specified renderer. Generally,
 		 * this is the selected item.
 		 */
-		protected function moveToRenderer(renderer:ICellRenderer):void
+		protected function moveToIndex(index:int):void
 		{	
+			index = Math.min(Math.max(this.minScrollIndex, index), this.maxScrollIndex);
+			
+			var item:Object = this.carousel.dataProvider.getItemAt(index);
+			var renderer:ICellRenderer = this.carousel.itemToCellRenderer(item);
 			var displayedRenderer:DisplayObject = DisplayObject(renderer);
 			var rendererX:Number = displayedRenderer.x;
 			var rendererY:Number = displayedRenderer.y;
@@ -254,7 +230,15 @@ package com.yahoo.astra.fl.controls.carouselClasses
 				{
 					case "middle":
 					{
-						rendererY -= (this.height - displayedRenderer.height) / 2;
+						if(this.pageSize % 2 == 0)
+						{
+							var doubleHeight:Number = 2 * displayedRenderer.height + this.verticalGap;
+							rendererY -= (this.height - doubleHeight) / 2;
+						}
+						else
+						{
+							rendererY -= (this.height - displayedRenderer.height) / 2;
+						}
 						break;
 					}
 					case "right":
@@ -270,7 +254,15 @@ package com.yahoo.astra.fl.controls.carouselClasses
 				{
 					case "center":
 					{
-						rendererX -= (this.width - displayedRenderer.width) / 2;
+						if(this.pageSize % 2 == 0)
+						{
+							var doubleWidth:Number = 2 * displayedRenderer.width + this.horizontalGap;
+							rendererX -= (this.width - doubleWidth) / 2;
+						}
+						else
+						{
+							rendererX -= (this.width - displayedRenderer.width) / 2;
+						}
 						break;
 					}
 					case "right":
@@ -283,9 +275,11 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			
 			var prevRendererX:Number = rendererX;
 			var prevRendererY:Number = rendererY;
-			if(this.previouslySelectedItem)
+			if(this.previouslySelectedIndex >= 0)
 			{
-				var prevRenderer:DisplayObject = this.carousel.itemToCellRenderer(this.previouslySelectedItem) as DisplayObject;
+				this.previouslySelectedIndex = Math.min(Math.max(this.minScrollIndex, this.previouslySelectedIndex), this.maxScrollIndex);
+				var previouslySelectedItem:Object = this.carousel.dataProvider.getItemAt(this.previouslySelectedIndex);
+				var prevRenderer:DisplayObject = this.carousel.itemToCellRenderer(previouslySelectedItem) as DisplayObject;
 				if(prevRenderer)
 				{
 					prevRendererX = prevRenderer.x;
@@ -296,7 +290,15 @@ package com.yahoo.astra.fl.controls.carouselClasses
 						{
 							case "middle":
 							{
-								prevRendererY -= (this.height - prevRenderer.height) / 2;
+								if(this.pageSize % 2 == 0)
+								{
+									doubleHeight = 2 * prevRenderer.height + this.verticalGap;
+									prevRendererY -= (this.height - doubleHeight) / 2;
+								}
+								else
+								{
+									prevRendererY -= (this.height - prevRenderer.height) / 2;
+								}
 								break;
 							}
 							case "right":
@@ -312,7 +314,15 @@ package com.yahoo.astra.fl.controls.carouselClasses
 						{
 							case "center":
 							{
-								prevRendererX -= (this.width - prevRenderer.width) / 2;
+								if(this.pageSize % 2 == 0)
+								{
+									doubleWidth = 2 * prevRenderer.width + this.horizontalGap;
+									prevRendererX -= (this.width - doubleWidth) / 2;
+								}
+								else
+								{
+									prevRendererX -= (this.width - prevRenderer.width) / 2;
+								}
 								break;
 							}
 							case "right":
@@ -338,7 +348,7 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			this.slide.easingFunction = this.animationEasingFunction;
 			this.slide.addEventListener(AnimationEvent.UPDATE, slideUpdateHandler);
 			this.slide.addEventListener(AnimationEvent.COMPLETE, slideCompleteHandler);
-			
+			this.previouslySelectedIndex = index;
 		}
 		
 	//--------------------------------------

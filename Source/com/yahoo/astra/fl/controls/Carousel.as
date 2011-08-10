@@ -9,9 +9,8 @@ package com.yahoo.astra.fl.controls
 	import com.yahoo.astra.fl.controls.carouselClasses.ICarouselLayoutRenderer;
 	import com.yahoo.astra.fl.controls.carouselClasses.SlidingCarouselRenderer;
 	import com.yahoo.astra.fl.controls.carouselClasses.StackCarouselRenderer;
-	import com.yahoo.astra.fl.utils.UIComponentUtil;
 	import com.yahoo.astra.fl.controls.carouselClasses.astra_carousel_internal;
-	
+	import com.yahoo.astra.fl.utils.UIComponentUtil;
 	
 	import fl.controls.ScrollPolicy;
 	import fl.controls.SelectableList;
@@ -50,128 +49,6 @@ package com.yahoo.astra.fl.controls
 			skin: "Carousel_skin",
 			contentPadding: 1
 		};
-		
-		/**
-         * @private
-         *
-         * @langversion 3.0
-         * @playerversion Flash 9.0.28.0
-		 */
-		protected var _rowHeight:Number = 20;
-
-		/**
-		 * Gets or sets the height of each row in the list, in pixels.
-         *
-         * @default 20
-         *
-         * @langversion 3.0
-         * @playerversion Flash 9.0.28.0
-		 */
-		public function get rowHeight():Number {
-			return _rowHeight;
-		}
-		
-		/**
-         * @private
-         *
-         * @langversion 3.0
-         * @playerversion Flash 9.0.28.0
-		 */
-		public function set rowHeight(value:Number):void {
-			_rowHeight = value;
-			invalidate(InvalidationType.SIZE);
-		}
-
-		/** 
-		 * @private (protected)
-         *
-		 */
-		protected var _rowCount:uint = 0;
-		
-		/**
-		 * @copy fl.controls.SelectableList 
-		 *
-		 * @default 1
-         *
-		 */
-		override public function get rowCount():uint 
-		{
-			return 1;
-		}	
-		
-		 /** 
-		 * @private (protected)
-         *
-		 */
-		protected var _columnWidth:Number = 50;
-		
-		[Inspectable(defaultValue=50)]
-		/**
-		 * Gets or sets the width that is applied to a column in the list, in pixels.
-         *
-		 * @default 50
-         *
-         * @includeExample examples/TileList.columnWidth.1.as -noswf
-         *
-         * @see #rowHeight
-         *
-		 */		
-		public function get columnWidth():Number {
-			return _columnWidth;
-		}
-		/**
-         * @private (setter)
-         *
-         * @langversion 3.0
-         * @playerversion Flash 9.0.28.0
-		 */
-		public function set columnWidth(value:Number):void {
-			if (_columnWidth == value) { return; }
-			_columnWidth = value;
-			invalidate(InvalidationType.SIZE);
-		}
-		
-		/**
-		 * @private (protected)
-		 */
-		protected var _columnCount:uint = 0;
-		
-		[Inspectable(defaultValue=0, type="Number")]
-		/**
-		 * Gets or sets the number of columns that are at least partially visible in the 
-		 * list. 
-         *
-		 * @default 0
-         *
-         * @see #rowCount
-         *
-		 */
-		public function get columnCount():uint {
-			var pad:Number = Number(getStyleValue("contentPadding"));
-			var cols:uint = Math.max(1,(_width-2*pad)/_columnWidth<<0);
-			var rows:uint = Math.max(1,(_height-2*pad)/_rowHeight<<0);
-
-				cols = Math.max(1,Math.ceil((_width-2*pad)/_columnWidth));
-
-			return cols;
-		}
-		
-		/**
-         * @private 
-		 */
-		public function set columnCount(value:uint):void 
-		{
-			if (value == 0) { return; }
-			if (componentInspectorSetting) { 
-				_columnCount = value; 
-				return;
-			}
-			_columnCount = 0;
-			
-			var pad:Number = Number(getStyleValue("contentPadding"));
-
-			width = columnWidth*value+2*pad;
-		}
 		
 					
 		/**
@@ -620,6 +497,13 @@ package com.yahoo.astra.fl.controls
 		{
 			this._layoutRenderer.cleanUp();
 			
+			for each(var renderer:ICellRenderer in this.activeCellRenderers)
+			{
+				if(!this._itemToRendererHash[renderer.data])
+				{
+					this.availableCellRenderers.push(renderer);
+				}
+			}
 			this.activeCellRenderers = [];
 			
 			//save any cell renderers that are already showing
@@ -628,7 +512,7 @@ package com.yahoo.astra.fl.controls
 			{
 				if(this.dataProvider.getItemIndex(item) < 0)
 				{
-					var renderer:ICellRenderer = ICellRenderer(this._itemToRendererHash[item]);
+					renderer = ICellRenderer(this._itemToRendererHash[item]);
 					this.availableCellRenderers.push(renderer);
 					delete this._itemToRendererHash[item];
 				}
@@ -686,7 +570,6 @@ package com.yahoo.astra.fl.controls
 			 * fl.controls.List does the same thing.
 			 * 
 			 */
-			 
 			var renderer:ICellRenderer = this.itemToCellRenderer(item);
 			if(renderer)
 			{
@@ -792,6 +675,8 @@ package com.yahoo.astra.fl.controls
 				}
 			}
 			
+			this.checkForChangedCellRendererStyle();
+			
 			super.draw();
 			
 			var contentPadding:Number = this.getStyleValue("contentPadding") as Number;
@@ -823,52 +708,50 @@ package com.yahoo.astra.fl.controls
 		 */
 		override protected function moveSelectionVertically(code:uint, shiftKey:Boolean, ctrlKey:Boolean):void 
 		{
-			var pageSize:int = Math.max(Math.floor(calculateAvailableHeight() / rowHeight), 1);
-			var newCaretIndex:int = -1;
-			var dir:int = 0;
-			switch(code) 
+			var selectionChanged:Boolean = true;
+			switch(code)
 			{
 				case Keyboard.UP:
-					if (caretIndex > 0) 
-					{
-						newCaretIndex = caretIndex - 1;
-					}
+				{
+					this.selectedIndex = Math.max(0, this.selectedIndex - this._layoutRenderer.stepSize);
 					break;
+				}
 				case Keyboard.DOWN:
-					if (caretIndex < length - 1) 
-					{
-						newCaretIndex = caretIndex + 1;
-					}
+				{
+					this.selectedIndex = Math.min(this.dataProvider.length - 1, this.selectedIndex + this._layoutRenderer.stepSize);
 					break;
-				case Keyboard.PAGE_UP:
-					if (caretIndex > 0) 
-					{
-						newCaretIndex = Math.max(caretIndex - pageSize, 0);
-					}
-					break;
-				case Keyboard.PAGE_DOWN:
-					if (caretIndex < length - 1) 
-					{
-						newCaretIndex = Math.min(caretIndex + pageSize, length - 1);
-					}
-					break;
+				}
 				case Keyboard.HOME:
-					if (caretIndex > 0) 
-					{
-						newCaretIndex = 0;
-					}
+				{
+					this.selectedIndex = 0;
 					break;
+				}
 				case Keyboard.END:
-					if (caretIndex < length - 1) 
-					{
-						newCaretIndex = length - 1;
-					}
+				{
+					//TODO: arguably, this bound could be modified to become a
+					//multiple of the stepSize rather than - 1.
+					this.selectedIndex = this.dataProvider.length - 1;
 					break;
+				}
+				case Keyboard.PAGE_UP:
+				{
+					this.selectedIndex = Math.max(0, this.selectedIndex - this._layoutRenderer.pageSize);
+					break;
+				}
+				case Keyboard.PAGE_DOWN:
+				{
+					this.selectedIndex = Math.min(this.dataProvider.length - 1, this.selectedIndex + this._layoutRenderer.pageSize);
+					break;
+				}
+				default:
+				{
+					selectionChanged = false;
+				}
 			}
-			if(newCaretIndex >= 0) 
+			
+			if(selectionChanged)
 			{
-				doKeySelection(newCaretIndex, shiftKey, ctrlKey);
-				scrollToSelected();
+				this.dispatchEvent(new Event(Event.CHANGE));
 			}
 		}
 		
@@ -877,85 +760,57 @@ package com.yahoo.astra.fl.controls
 		 */
 		override public function scrollToIndex(newCaretIndex:int):void 
 		{
-			drawNow();
-			
-			var lastVisibleItemIndex:uint = Math.floor((_verticalScrollPosition + availableHeight) / rowHeight) - 1;
-			var firstVisibleItemIndex:uint = Math.ceil(_verticalScrollPosition / rowHeight);
-			if(newCaretIndex < firstVisibleItemIndex) 
-			{
-				verticalScrollPosition = newCaretIndex * rowHeight;
-			} 
-			else if(newCaretIndex > lastVisibleItemIndex) 
-			{
-				verticalScrollPosition = (newCaretIndex + 1) * rowHeight - availableHeight;
-			}
-		}		
+			//should be passed to layout renderer
+		}
+		
 		/**
          * @inheritDoc
 		 */
 		override protected function moveSelectionHorizontally(code:uint, shiftKey:Boolean, ctrlKey:Boolean):void 
 		{
-			var totalCols:uint = length;
-			
-			var index:int;
-			switch(code) 
+			var selectionChanged:Boolean = true;
+			switch(code)
 			{
 				case Keyboard.LEFT:
-					index = Math.max(0, selectedIndex - 1); break;
+				{
+					this.selectedIndex = Math.max(0, this.selectedIndex - this._layoutRenderer.stepSize);
+					break;
+				}
 				case Keyboard.RIGHT:
-					index = Math.min(length - 1, selectedIndex + 1); break;
+				{
+					this.selectedIndex = Math.min(this.dataProvider.length - 1, this.selectedIndex + this._layoutRenderer.stepSize);
+					break;
+				}
 				case Keyboard.HOME:
-					index = 0; break;
+				{
+					this.selectedIndex = 0;
+					break;
+				}
 				case Keyboard.END:
-					index = length - 1; break;					
+				{
+					this.selectedIndex = this.dataProvider.length - 1;
+					break;
+				}
 				case Keyboard.PAGE_UP:
-					var firstIndex:int = selectedIndex;
-					index = Math.max(0, Math.max(firstIndex, selectedIndex - length));
-					break; 
+				{
+					this.selectedIndex = Math.max(0, this.selectedIndex - this._layoutRenderer.pageSize);
+					break;
+				}
 				case Keyboard.PAGE_DOWN:
-					var lastIndex:int = selectedIndex - selectedIndex % totalCols + totalCols -1;
-					index = Math.min(length - 1, Math.min(lastIndex, selectedIndex + totalCols)); break;
-			}
-	
-			doKeySelection(index, shiftKey, ctrlKey);
-			scrollToSelected();
-		}
-		
-        /**
-         * @private (protected)
-         *
-         * @langversion 3.0
-         * @playerversion Flash 9.0.28.0
-		 */		
-		protected function doKeySelection(newCaretIndex:int, shiftKey:Boolean, ctrlKey:Boolean):void {
-			var selChanged:Boolean = false;
-			if(shiftKey) {
-				var i:int;
-				var selIndices:Array = [];
-				var startIndex:int = lastCaretIndex;
-				var endIndex:int = newCaretIndex;
-				if(startIndex == -1) {
-					startIndex = caretIndex != -1 ? caretIndex : newCaretIndex;
+				{
+					this.selectedIndex = Math.min(this.dataProvider.length - 1, this.selectedIndex + this._layoutRenderer.pageSize);
+					break;
 				}
-				if(startIndex > endIndex) {
-					endIndex = startIndex;
-					startIndex = newCaretIndex;
+				default:
+				{
+					selectionChanged = false;
 				}
-				for(i = startIndex; i <= endIndex; i++) {
-					selIndices.push(i);
-				}
-				selectedIndices = selIndices;
-				caretIndex = newCaretIndex;
-				selChanged = true;
-			} else {
-				selectedIndex = newCaretIndex;
-				caretIndex = lastCaretIndex = newCaretIndex;
-				selChanged = true;
 			}
-			if(selChanged) {
-				dispatchEvent(new Event(Event.CHANGE));
+			
+			if(selectionChanged)
+			{
+				this.dispatchEvent(new Event(Event.CHANGE));
 			}
-			invalidate(InvalidationType.DATA);
 		}
 		
        
@@ -966,7 +821,28 @@ package com.yahoo.astra.fl.controls
 		{
 			var pad:Number = Number(getStyleValue("contentPadding"));
 			return height-pad*2-((_horizontalScrollPolicy == ScrollPolicy.ON || (_horizontalScrollPolicy == ScrollPolicy.AUTO && _maxHorizontalScrollPosition > 0)) ? 15 : 0);
-		}		
+		}	
+		
+		/**
+		 * @private
+		 */ 
+		protected function checkForChangedCellRendererStyle():void
+		{
+			if(this.activeCellRenderers.length == 0)
+			{
+				return;
+			}
+			
+			var CellRendererType:Class = Class(this.getStyleValue("cellRenderer"));
+			var firstCellRenderer:ICellRenderer = ICellRenderer(this.activeCellRenderers[0]);
+			if(firstCellRenderer is CellRendererType)
+			{
+				return;
+			}
+			
+			this.activeCellRenderers = [];
+			this.astra_carousel_internal::validateCellRenderers();
+		}	
 		
 		/**
 	     *  @inheritDoc

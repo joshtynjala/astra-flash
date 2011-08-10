@@ -51,6 +51,16 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		 * @private
 		 */
 		function set carousel(value:Carousel):void;
+		
+		/**
+		 * The number of cells displayed in a single page.
+		 */
+		function get pageSize():int;
+		
+		/**
+		 * The number of cells displayed in a single page.
+		 */
+		function get stepSize():int;
 	
 	//--------------------------------------
 	//  Methods

@@ -138,7 +138,7 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		
 		/**
 		 * @private
-		 * Storage for the forceCreationOfAllRenderers property.
+		 * Storage for the drawAllRenderers property.
 		 */
 		private var _drawAllRenderers:Boolean = false;
 		
@@ -190,6 +190,26 @@ package com.yahoo.astra.fl.controls.carouselClasses
 		{
 			this._autoSize = value;
 			this.invalidate(InvalidationType.DATA);
+		}
+		
+		/**
+		 * @inheritDoc
+		 * 
+		 * <p>The page size for a stack layout is always <code>1</code>.</p>
+		 */
+		public function get pageSize():int
+		{
+			return 1;
+		}
+		
+		/**
+		 * @inheritDoc
+		 * 
+		 * <p>The step size for a stack layout is always <code>1</code>.</p>
+		 */
+		public function get stepSize():int
+		{
+			return 1;
 		}
 		
 	//--------------------------------------
@@ -318,6 +338,18 @@ package com.yahoo.astra.fl.controls.carouselClasses
 			}
 			
 			this.carousel.astra_carousel_internal::validateCellRenderers();
+		}
+		
+		/**
+		 * @private
+		 */
+		override protected function validate():void
+		{
+			super.validate();
+			
+			//don't let the component draw again when it doesn't need to
+			//monkey patch to ensure animation will work.
+			delete this.callLaterMethods[draw];
 		}
 		
 	//--------------------------------------
