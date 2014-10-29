@@ -13,3 +13,5 @@ The respository is neither owned, maintained, nor endorsed by Yahoo! Inc.
 h2. Usage
 
 Download and extract astra-flash-1.4.zip to access the compiled MXP for the Astra Flash components. The MXP may be installed for Adobe Flash Professional with Adobe Extension Manager.
+
+Add the updated ActionScript files to your project's source path, and they will automatically override the compiled component symbol in the library.
